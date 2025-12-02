@@ -8,8 +8,8 @@
         xmlns:views="clr-namespace:FieldScanNew.Views"
 
         mc:Ignorable="d"
-        Title="配置" Height="450" Width="600"
-        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        Title="配置" Height="550" Width="900"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize">
 
     <Window.Resources>
         <DataTemplate DataType="{x:Type viewmodels:InstrumentSetupViewModel}">

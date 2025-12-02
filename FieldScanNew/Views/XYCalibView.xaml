@@ -1,7 +1,238 @@
 ﻿<UserControl x:Class="FieldScanNew.Views.XYCalibView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid>
-        <TextBlock Text="5. XY平面校准界面" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:viewmodels="clr-namespace:FieldScanNew.ViewModels"
+             mc:Ignorable="d" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance Type=viewmodels:XYCalibViewModel}"
+             d:DesignHeight="600" d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <ScrollViewer Grid.Column="0" Margin="0,0,20,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <GroupBox Header="1. 图像采集" Padding="10">
+                    <StackPanel>
+                        <ComboBox ItemsSource="{Binding CameraList}" SelectedIndex="{Binding SelectedCameraIndex}" Margin="0,0,0,10"/>
+                        <ContentControl>
+                            <ContentControl.Style>
+                                <Style TargetType="ContentControl">
+                                    <Setter Property="Content">
+                                        <Setter.Value>
+                                            <Button Content="📷 打开摄像头" Command="{Binding ToggleCameraCommand}" Height="30"/>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCameraMode}" Value="True">
+                                            <Setter Property="Content">
+                                                <Setter.Value>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button Content="❌ 关闭" Command="{Binding ToggleCameraCommand}" Width="80" Background="#FFCCCC" Margin="0,0,10,0" Height="30"/>
+                                                        <Button Content="✅ 拍照" Command="{Binding CaptureCommand}" Width="120" FontWeight="Bold" Background="#CCFFCC" Height="30"/>
+                                                    </StackPanel>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ContentControl.Style>
+                        </ContentControl>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="2. 机械臂移动 (点动)" Padding="10" Margin="0,10,0,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <TextBlock Text="步长:" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding JogStep}" Width="50" Margin="5,0,0,0" TextAlignment="Center"/>
+                            <TextBlock Text="mm" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                        </StackPanel>
+                        <Grid HorizontalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Row="0" Grid.Column="1" Content="Y+" Width="50" Height="40" Margin="2" Command="{Binding JogCommand}" CommandParameter="Y+"/>
+                            <Button Grid.Row="1" Grid.Column="0" Content="X-" Width="50" Height="40" Margin="2" Command="{Binding JogCommand}" CommandParameter="X-"/>
+                            <Button Grid.Row="1" Grid.Column="2" Content="X+" Width="50" Height="40" Margin="2" Command="{Binding JogCommand}" CommandParameter="X+"/>
+                            <Button Grid.Row="2" Grid.Column="1" Content="Y-" Width="50" Height="40" Margin="2" Command="{Binding JogCommand}" CommandParameter="Y-"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <TextBlock Text="{Binding InstructionText}" Foreground="Blue" TextWrapping="Wrap" FontWeight="Bold" Margin="0,15,0,10" FontSize="13"/>
+
+                <GroupBox Header="3. 坐标记录" Padding="10">
+                    <StackPanel>
+                        <Button Content="↺ 重新选点" Command="{Binding ResetCommand}" Margin="0,0,0,10"/>
+
+                        <Border BorderBrush="#DDD" BorderThickness="1" Padding="5" Margin="0,0,0,10" Background="#F9F9F9">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="特征点 1" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button DockPanel.Dock="Right" Content="📍 读取机械臂坐标" FontSize="11" Padding="5,2" 
+                                            Command="{Binding ReadRobotPosCommand}" CommandParameter="1"/>
+                                </DockPanel>
+                                <TextBlock Text="{Binding PixelP1Text}" Foreground="Gray" FontSize="11" Margin="0,2,0,5"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="X (mm):" VerticalAlignment="Center" Margin="0,0,5,5"/>
+                                    <TextBox Grid.Column="1" Text="{Binding PhysicalX1}" Margin="0,0,0,5"/>
+                                    <TextBlock Grid.Row="1" Text="Y (mm):" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PhysicalY1}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="#DDD" BorderThickness="1" Padding="5" Margin="0,0,0,15" Background="#F9F9F9">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="特征点 2" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button DockPanel.Dock="Right" Content="📍 读取机械臂坐标" FontSize="11" Padding="5,2" 
+                                            Command="{Binding ReadRobotPosCommand}" CommandParameter="2"/>
+                                </DockPanel>
+                                <TextBlock Text="{Binding PixelP2Text}" Foreground="Gray" FontSize="11" Margin="0,2,0,5"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="X (mm):" VerticalAlignment="Center" Margin="0,0,5,5"/>
+                                    <TextBox Grid.Column="1" Text="{Binding PhysicalX2}" Margin="0,0,0,5"/>
+                                    <TextBlock Grid.Row="1" Text="Y (mm):" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PhysicalY2}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Button Content="⚡ 计算校准参数" Command="{Binding CalibrateCommand}" Height="40" FontSize="14" FontWeight="Bold" Background="#E0F7FA"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Background="#333" ClipToBounds="True">
+            <Grid>
+                <Viewbox Stretch="Uniform">
+                    <Grid Width="{Binding DutImageSource.PixelWidth}" Height="{Binding DutImageSource.PixelHeight}">
+
+                        <Image x:Name="StaticImage" Source="{Binding DutImageSource}" 
+                               MouseLeftButtonDown="Image_MouseLeftButtonDown" Cursor="Cross"/>
+
+                        <Image Source="{Binding CameraPreviewSource}" IsHitTestVisible="False">
+                            <Image.Style>
+                                <Style TargetType="Image">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCameraMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Image.Style>
+                        </Image>
+
+                        <Canvas IsHitTestVisible="False">
+                            <Ellipse Width="10" Height="10" Fill="Red" Stroke="White" StrokeThickness="1"
+                                     Canvas.Left="{Binding P1Left}" Canvas.Top="{Binding P1Top}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowP1}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="P1" Canvas.Left="{Binding P1Left}" Canvas.Top="{Binding P1Top}" Foreground="Red" FontWeight="Bold" FontSize="20" Margin="10,-20,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowP1}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <Ellipse Width="10" Height="10" Fill="Blue" Stroke="White" StrokeThickness="1"
+                                     Canvas.Left="{Binding P2Left}" Canvas.Top="{Binding P2Top}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowP2}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="P2" Canvas.Left="{Binding P2Left}" Canvas.Top="{Binding P2Top}" Foreground="Blue" FontWeight="Bold" FontSize="20" Margin="10,-20,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowP2}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Canvas>
+
+                    </Grid>
+                </Viewbox>
+
+                <TextBlock Text="请打开摄像头拍摄图片" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#DDD" FontSize="24" IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding DutImageSource}" Value="{x:Null}"/>
+                                        <Condition Binding="{Binding IsCameraMode}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

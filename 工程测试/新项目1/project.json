@@ -1,6 +1,6 @@
 {
   "ProjectName": "\u65B0\u9879\u76EE1",
-  "DutImagePath": null,
+  "DutImagePath": "D:\\RFNE\\\u5409\u5229\u6C7D\u8F6625.7\\FS_New\\\u5DE5\u7A0B\u6D4B\u8BD5\\\u65B0\u9879\u76EE1\\Images\\Capture_20251201_163300.jpg",
   "ActiveProbeName": null,
   "InstrumentConfig": {
     "IpAddress": "192.168.0.22",
@@ -13,12 +13,22 @@
     "ReferenceLevelDb": 0
   },
   "ScanConfig": {
-    "StartX": 0,
-    "StartY": 0,
-    "StopX": 0,
-    "StopY": 0,
-    "NumX": 0,
-    "NumY": 0,
+    "StartX": -90.5586,
+    "StartY": -25.122807,
+    "StopX": 315.75583,
+    "StopY": 316.42255,
+    "NumX": 10,
+    "NumY": 10,
     "ScanHeightZ": 0
-  }
+  },
+  "MeasurementNames": [
+    "test"
+  ],
+  "IsCalibrated": true,
+  "MatrixM11": 0.4090757625407397,
+  "MatrixM12": -0.06341719657786585,
+  "MatrixM21": 0.06341719657786585,
+  "MatrixM22": 0.4090757625407397,
+  "OffsetX": -119.05906465637108,
+  "OffsetY": -41.06952705916484
 }

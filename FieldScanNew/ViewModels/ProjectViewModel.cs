@@ -1,7 +1,7 @@
 ﻿using FieldScanNew.Infrastructure;
 using FieldScanNew.Models;
 using System.Collections.ObjectModel;
-using System.Windows.Input; // 需要引用 ICommand
+using System.Windows.Input;
 
 namespace FieldScanNew.ViewModels
 {
@@ -28,9 +28,9 @@ namespace FieldScanNew.ViewModels
             }
         }
 
-        private MainViewModel ParentMainViewModel { get; }
+        // **核心修正 1：将 private 改为 public，让子级能访问到主ViewModel**
+        public MainViewModel ParentMainViewModel { get; }
 
-        // **新增**：用于添加新测量项的命令
         public ICommand AddNewMeasurementCommand { get; }
 
         public ProjectViewModel(string name, string folderPath, MainViewModel parent)
@@ -40,18 +40,18 @@ namespace FieldScanNew.ViewModels
             ParentMainViewModel = parent;
             ProjectData = new ProjectData { ProjectName = name };
 
-            // **核心改动**：初始化一个空的测量项列表
             Measurements = new ObservableCollection<MeasurementViewModel>();
 
-            // 初始化命令，并指定要执行的方法
             AddNewMeasurementCommand = new RelayCommand(ExecuteAddNewMeasurement);
         }
 
         private void ExecuteAddNewMeasurement(object? parameter)
         {
-            // **核心修正**：创建测量项时，把对自己的引用(this)传递下去
             var newMeasurement = new MeasurementViewModel($"New Measurement {Measurements.Count + 1}", this);
             Measurements.Add(newMeasurement);
+
+            // **核心修正 2：新建测量项后，立即触发自动保存**
+            ParentMainViewModel.AutoSaveCurrentProject(this);
         }
     }
 }

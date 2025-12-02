@@ -13,7 +13,18 @@ namespace FieldScanNew.ViewModels
     {
         public string DisplayName => "1. 仪器连接";
         private readonly HardwareService _hardwareService;
-        public InstrumentSettings InstrumentSettings { get; }
+
+        // **核心修正：将只读属性改为可读写属性，并添加通知**
+        private InstrumentSettings _instrumentSettings;
+        public InstrumentSettings InstrumentSettings
+        {
+            get => _instrumentSettings;
+            set
+            {
+                _instrumentSettings = value;
+                OnPropertyChanged(); // 通知界面：设置对象变了
+            }
+        }
 
         private bool _isConnecting = false;
         public bool IsConnecting { get => _isConnecting; set { _isConnecting = value; OnPropertyChanged(); } }
@@ -24,7 +35,6 @@ namespace FieldScanNew.ViewModels
         private string _saStatus = "未连接";
         public string SaStatus { get => _saStatus; set { _saStatus = value; OnPropertyChanged(); } }
 
-        // **新增**：用于选择硬件的列表
         public ObservableCollection<string> AvailableRobots { get; }
         public ObservableCollection<string> AvailableDevices { get; }
 
@@ -34,7 +44,6 @@ namespace FieldScanNew.ViewModels
         private string _selectedDevice = "Spectrum Analyzer (VISA)";
         public string SelectedDevice { get => _selectedDevice; set { _selectedDevice = value; OnPropertyChanged(); } }
 
-        // **重构**：分离为两个独立的命令
         public ICommand ConnectRobotCommand { get; }
         public ICommand DisconnectRobotCommand { get; }
         public ICommand ConnectSaCommand { get; }
@@ -43,13 +52,11 @@ namespace FieldScanNew.ViewModels
         public InstrumentSetupViewModel(InstrumentSettings settings)
         {
             _hardwareService = HardwareService.Instance;
-            InstrumentSettings = settings;
+            _instrumentSettings = settings; // 初始化
 
-            // 初始化可选硬件列表
             AvailableRobots = new ObservableCollection<string> { "慧灵科技 Z-Arm 2442" };
             AvailableDevices = new ObservableCollection<string> { "Spectrum Analyzer (VISA)", "Vector Network Analyzer", "示波器" };
 
-            // 绑定分离后的命令
             ConnectRobotCommand = new RelayCommand(async _ => await ExecuteConnectRobot(), _ => !IsConnecting);
             DisconnectRobotCommand = new RelayCommand(_ => ExecuteDisconnectRobot(), _ => !IsConnecting);
             ConnectSaCommand = new RelayCommand(async _ => await ExecuteConnectSa(), _ => !IsConnecting);
