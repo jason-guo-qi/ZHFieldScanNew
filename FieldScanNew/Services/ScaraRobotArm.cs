@@ -30,10 +30,7 @@ namespace FieldScanNew.Services
                 int state = _robot.initial(1, 210);
                 if (state != 1) throw new Exception("机器人初始化失败！");
                 _robot.unlock_position();
-
-                // 默认关闭拖动模式，防止意外移动
                 _robot.set_drag_teach(false);
-
                 IsConnected = true;
             });
         }
@@ -42,7 +39,6 @@ namespace FieldScanNew.Services
         {
             if (IsConnected)
             {
-                // 断开前确保关闭拖动，防止手臂掉落（虽然Z轴可能有抱闸，但为了安全）
                 _robot?.set_drag_teach(false);
                 TcpserverEx.close_tcpserver();
                 IsConnected = false;
@@ -89,7 +85,17 @@ namespace FieldScanNew.Services
             });
         }
 
-        // **核心修正：实现拖动模式切换**
+        // **核心修正：实现 MoveToNoWaitAsync**
+        // 只发指令，不检查是否到达（专门用于拖动模式下的 Z 轴保持）
+        public async Task MoveToNoWaitAsync(float x, float y, float z, float r)
+        {
+            if (!IsConnected || _robot == null) throw new InvalidOperationException("机器人未连接");
+            await Task.Run(() =>
+            {
+                _robot.new_movej_xyz_lr(x, y, z, r, 30, 1, y > 0 ? 1 : -1);
+            });
+        }
+
         public async Task SetDragModeAsync(bool enable)
         {
             if (!IsConnected || _robot == null) throw new InvalidOperationException("机器人未连接");
