@@ -44,15 +44,22 @@ namespace FieldScanNew.Services
                     if (settings.Points > 0)
                         _saSession.FormattedIO.WriteLine($":SWE:POIN {settings.Points}");
 
+                    // 下发 RBW / VBW
+                    if (settings.RbwHz > 0)
+                        _saSession.FormattedIO.WriteLine(string.Format(CultureInfo.InvariantCulture, ":BAND {0}", settings.RbwHz));
+                    else
+                        _saSession.FormattedIO.WriteLine(":BAND:AUTO ON");
+
+                    if (settings.VbwHz > 0)
+                        _saSession.FormattedIO.WriteLine(string.Format(CultureInfo.InvariantCulture, ":BAND:VID {0}", settings.VbwHz));
+                    else
+                        _saSession.FormattedIO.WriteLine(":BAND:VID:AUTO ON");
+
                     _saSession.FormattedIO.WriteLine(":DET:TRAC POS");
+                    _saSession.FormattedIO.WriteLine(":INIT:CONT OFF"); // 关闭连续扫描
+                    _saSession.FormattedIO.WriteLine(":FORM:DATA ASC");
 
-                    // =========================================================
-                    // **核心修正：关闭连续扫描，改为单次触发模式**
-                    // 这能确保每次都是全新的、完整的数据
-                    // =========================================================
-                    _saSession.FormattedIO.WriteLine(":INIT:CONT OFF");
-
-                    _saSession.TimeoutMilliseconds = 30000;
+                    _saSession.TimeoutMilliseconds = 30000; // 默认30秒
                     IsConnected = true;
                 }
                 catch (Exception ex)
@@ -71,10 +78,8 @@ namespace FieldScanNew.Services
 
         public async Task<double> GetMeasurementValueAsync(int delayMs)
         {
-            var traceData = await GetTraceDataAsync(delayMs);
-            if (traceData.Length > 0)
-                return traceData.Max();
-            return -120.0; // 如果没数据，返回底噪水平而不是 -999，避免图表缩放异常
+            var trace = await GetTraceDataAsync(delayMs);
+            return trace.Length > 0 ? trace.Max() : -120.0;
         }
 
         public async Task<double[]> GetTraceDataAsync(int delayMs)
@@ -88,31 +93,43 @@ namespace FieldScanNew.Services
                     var formattedIO = _saSession.FormattedIO;
 
                     // =========================================================
-                    // **核心修正：握手式扫描逻辑**
+                    // **核心修正：智能自适应超时**
+                    // =========================================================
+                    // 1. 询问仪器：当前设置下，扫一次要多久？
+                    formattedIO.WriteLine(":SWE:TIME?");
+                    string sweTimeStr = formattedIO.ReadLine();
+
+                    if (double.TryParse(sweTimeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double sweTimeSec))
+                    {
+                        // 计算所需时间 (秒 -> 毫秒) + 5秒缓冲
+                        int neededTimeMs = (int)(sweTimeSec * 1000) + 5000;
+
+                        // 如果需要的时间超过了当前的 Visa Timeout，就临时加长
+                        if (neededTimeMs > _saSession.TimeoutMilliseconds)
+                        {
+                            _saSession.TimeoutMilliseconds = neededTimeMs;
+                        }
+                    }
                     // =========================================================
 
-                    // 1. 设置轨迹类型为写入 (每一次都是新的)
+                    // 2. 刷新测量
                     formattedIO.WriteLine(":TRAC:TYPE WRIT");
 
-                    // 2. 发起一次扫描，并死等它完成 (*WAI)
-                    // 这样程序会自动适应 RBW 造成的扫描时间变化，不用人为设置 Sleep
+                    // 3. 发起扫描并等待完成 (*WAI)
+                    // 现在不用担心超时了，因为我们刚才已经延长时间了
                     formattedIO.WriteLine(":INIT:IMM; *WAI");
 
-                    // 3. (可选) 如果还需要额外的稳定时间，才使用 delayMs
-                    // 通常有了 *WAI 就不需要 delayMs 了，除非有外部放大器稳定时间
                     if (delayMs > 0) Thread.Sleep(delayMs);
 
                     // 4. 读取数据
                     formattedIO.WriteLine(":TRAC:DATA? TRACE1");
-
                     string dataStr = formattedIO.ReadLine();
 
                     if (string.IsNullOrWhiteSpace(dataStr)) return new double[0];
 
-                    var values = dataStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                                        .Select(s => double.Parse(s, CultureInfo.InvariantCulture))
-                                        .ToArray();
-                    return values;
+                    return dataStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                                  .Select(s => double.Parse(s, CultureInfo.InvariantCulture))
+                                  .ToArray();
                 }
                 catch (Exception ex)
                 {

@@ -91,7 +91,6 @@
                                 <Setter Property="Padding" Value="2"/>
                             </Style>
                         </TreeView.ItemContainerStyle>
-
                         <TreeView.Resources>
                             <HierarchicalDataTemplate DataType="{x:Type viewmodels:ProjectViewModel}" ItemsSource="{Binding Measurements}">
                                 <StackPanel Orientation="Horizontal">
@@ -104,7 +103,6 @@
                                     </StackPanel.ContextMenu>
                                 </StackPanel>
                             </HierarchicalDataTemplate>
-
                             <HierarchicalDataTemplate DataType="{x:Type viewmodels:MeasurementViewModel}" ItemsSource="{Binding Steps}">
                                 <TextBlock Text="{Binding DisplayName}">
                                     <TextBlock.ContextMenu>
@@ -114,42 +112,36 @@
                                     </TextBlock.ContextMenu>
                                 </TextBlock>
                             </HierarchicalDataTemplate>
-
                             <DataTemplate DataType="{x:Type viewmodels:InstrumentSetupViewModel}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="30,0,5,0" Foreground="DimGray"/>
                                     <TextBlock Text="{Binding DisplayName}"/>
                                 </StackPanel>
                             </DataTemplate>
-
                             <DataTemplate DataType="{x:Type viewmodels:ProbeSetupViewModel}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="30,0,5,0" Foreground="DimGray"/>
                                     <TextBlock Text="{Binding DisplayName}"/>
                                 </StackPanel>
                             </DataTemplate>
-
                             <DataTemplate DataType="{x:Type viewmodels:ScanSettingsViewModel}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="30,0,5,0" Foreground="DimGray"/>
                                     <TextBlock Text="{Binding DisplayName}"/>
                                 </StackPanel>
                             </DataTemplate>
-
                             <DataTemplate DataType="{x:Type viewmodels:ZCalibViewModel}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE752;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="30,0,5,0" Foreground="DimGray"/>
                                     <TextBlock Text="{Binding DisplayName}"/>
                                 </StackPanel>
                             </DataTemplate>
-
                             <DataTemplate DataType="{x:Type viewmodels:XYCalibViewModel}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE809;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="30,0,5,0" Foreground="DimGray"/>
                                     <TextBlock Text="{Binding DisplayName}"/>
                                 </StackPanel>
                             </DataTemplate>
-
                             <DataTemplate DataType="{x:Type viewmodels:ScanAreaViewModel}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE7B3;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="30,0,5,0" Foreground="DimGray"/>
