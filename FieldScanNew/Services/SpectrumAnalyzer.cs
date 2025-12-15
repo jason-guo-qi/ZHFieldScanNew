@@ -20,7 +20,8 @@ namespace FieldScanNew.Services
             await Task.Run(() =>
             {
                 // 注意：这里使用的是 SOCKET 协议
-                string visaAddress = $"TCPIP0::{settings.IpAddress}::{settings.Port}::SOCKET";
+                //string visaAddress = $"TCPIP0::{settings.IpAddress}::{settings.Port}::SOCKET";
+                string visaAddress = $"TCPIP0::{settings.IpAddress}::INSTR";
 
                 var visaSession = GlobalResourceManager.Open(visaAddress);
                 _saSession = visaSession as IMessageBasedSession;
@@ -39,6 +40,10 @@ namespace FieldScanNew.Services
                 // 对于 SOCKET 连接，通常不需要 SendEnd
                 _saSession.SendEndEnabled = false;
                 // =========================================================
+
+                // 在 IsConnected = true; 之前加上：
+                _saSession.FormattedIO.WriteLine("*IDN?");
+                string idn = _saSession.FormattedIO.ReadLine(); // 如果这里没报错，说明连接绝对没问题
 
                 IsConnected = true;
             });
