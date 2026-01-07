@@ -124,6 +124,7 @@ namespace FieldScanNew.ViewModels
                 var settingVm = measurement.Steps.OfType<ScanSettingsViewModel>().FirstOrDefault();
                 if (settingVm != null) settingVm.Settings = CurrentInstrumentSettings;
 
+
                 var scanVm = measurement.Steps.OfType<ScanAreaViewModel>().FirstOrDefault();
                 if (scanVm != null) scanVm.Settings = CurrentScanSettings;
             }
