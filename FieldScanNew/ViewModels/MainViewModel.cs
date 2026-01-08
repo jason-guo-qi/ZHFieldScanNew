@@ -2,25 +2,34 @@
 using FieldScanNew.Models;
 using FieldScanNew.Services;
 using FieldScanNew.Views;
+using MathNet.Numerics;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
+using Microsoft.Win32;
+using Newtonsoft.Json; // 需要添加
+using Newtonsoft.Json.Linq; // 需要自行添加
 using OxyPlot;
+using OxyPlot.Annotations;
 using OxyPlot.Axes;
 using OxyPlot.Series;
-using OxyPlot.Annotations;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-
-using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using MessageBox = System.Windows.MessageBox;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
@@ -306,7 +315,7 @@ namespace FieldScanNew.ViewModels
             finally { IsScanning = false; }
         }
 
-            private async Task QBCExecuteStartScan()
+        private async Task QBCExecuteStartScan()
         {
             // ===================== 原有逻辑：前置校验（完全保留） =====================
             if (_hardwareService.ActiveRobot == null || !_hardwareService.ActiveRobot.IsConnected ||
@@ -591,7 +600,7 @@ namespace FieldScanNew.ViewModels
                     Console.WriteLine($"QBC采样进度：{sampledPoints.Count}/{targetSampleCount}");
                 }
 
-                                // 1. 调用填充方法（复用原有变量，仅新增临时变量）
+                // 1. 调用填充方法（复用原有变量，仅新增临时变量）
                 var (filledHeatMapData, fullPointMap) = FillUnsampledPointsWithRbfMean(sampledPoints, scanSettings);
                 heatMapSeries = HeatmapModel.Series.OfType<HeatMapSeries>().FirstOrDefault();
                 if (heatMapSeries != null)
@@ -844,7 +853,7 @@ namespace FieldScanNew.ViewModels
             private double[] _yObs;
             private RbfKernel _kernel;
             private int _degree;
-            private Vector<double> _weights;
+            private MathNet.Numerics.LinearAlgebra.Vector<double> _weights;
             private int _polySize;
 
             public RbfInterpolator(double[][] xObs, double[] yObs, RbfKernel kernel, int degree)
@@ -1023,7 +1032,7 @@ namespace FieldScanNew.ViewModels
             // 2. 生成全场网格坐标（和原始扫描分辨率一致）
             var xCoor = GenerateLinspace(xMin, xMax, scanSettings.NumX);
             var yCoor = GenerateLinspace(yMin, yMax, scanSettings.NumY);
-            
+
             // 3. 构建已采样点的坐标-幅值映射（快速查询）
             var sampledPointMap = new Dictionary<(float X, float Y), double>();
             foreach (var p in sampledPoints)
