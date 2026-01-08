@@ -31,6 +31,16 @@ using System.Windows.Media.Imaging;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
+using MathNet.Numerics;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
+using Microsoft.Win32;
+using Newtonsoft.Json; // 需要添加
+using Newtonsoft.Json.Linq; // 需要自行添加
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Windows;
+
 namespace FieldScanNew.ViewModels
 {
     public class MainViewModel : ViewModelBase
@@ -628,10 +638,10 @@ namespace FieldScanNew.ViewModels
                     {
                         float targetX = (float)xCoor[i];
                         var key = ((float)Math.Round(targetX, 3), (float)Math.Round(targetY, 3));
-
+                        
                         // 获取填充后的幅值（已采样点=原始值，未采样点=RBF均值）
                         double filledVal = fullPointMap.TryGetValue(key, out var val) ? val : 0;
-
+                        
                         // 复用sbPeak：写入填充后的数据（保留原格式）
                         sbPeak.AppendLine($"{targetX:F3},{targetY:F3},{filledVal:F3}");
 
