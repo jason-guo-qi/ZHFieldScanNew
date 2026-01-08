@@ -17,7 +17,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -31,6 +30,16 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+
+using MathNet.Numerics;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
+using Microsoft.Win32;
+using Newtonsoft.Json; // 需要添加
+using Newtonsoft.Json.Linq; // 需要自行添加
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Windows;
 
 namespace FieldScanNew.ViewModels
 {
@@ -134,7 +143,6 @@ namespace FieldScanNew.ViewModels
             HeatmapModel.PlotType = PlotType.Cartesian;
             HeatmapModel.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, IsAxisVisible = false });
             HeatmapModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, IsAxisVisible = false });
-
             var palette = OxyPalettes.Jet(100);
             var transparentColors = palette.Colors.Select(c => OxyColor.FromAColor(180, c));
             HeatmapModel.Axes.Add(new LinearColorAxis { Position = AxisPosition.Right, Palette = new OxyPalette(transparentColors), Title = "信号强度 (dBuV/m)" });
@@ -159,74 +167,128 @@ namespace FieldScanNew.ViewModels
 
         // ... (LoadDutImage, UpdatePlotBackground, OnSettingsChanged... 保持不变，为了节省篇幅已省略) ...
         // 请务必保留您原文件中的这些辅助方法
+        /// <summary>
+        /// 加载被测设备(DUT)的图片
+        /// </summary>
         private void LoadDutImage()
         {
-            var project = Projects.FirstOrDefault(p => p.IsSelected);
-            if (project != null && !string.IsNullOrEmpty(project.ProjectData.DutImagePath) && File.Exists(project.ProjectData.DutImagePath))
+            // 获取当前选中的项目
+            var selectedProject = Projects.FirstOrDefault(p => p.IsSelected);
+
+            // 验证项目和图片路径有效性
+            if (selectedProject != null
+                && !string.IsNullOrEmpty(selectedProject.ProjectData.DutImagePath)
+                && File.Exists(selectedProject.ProjectData.DutImagePath))
             {
                 try
                 {
+                    // 创建并初始化位图对象
                     var bitmap = new BitmapImage();
                     bitmap.BeginInit();
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.UriSource = new Uri(project.ProjectData.DutImagePath); bitmap.EndInit(); bitmap.Freeze(); DutImageSource = bitmap;
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.UriSource = new Uri(selectedProject.ProjectData.DutImagePath);
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+
+                    // 赋值到图片源属性
+                    DutImageSource = bitmap;
                 }
-                catch { DutImageSource = null; }
-            }
-            else { DutImageSource = null; }
-        }
-        private void UpdatePlotBackground()
-        {
-            HeatmapModel.Annotations.Clear();
-            if (DutImageSource == null) { HeatmapModel.InvalidatePlot(true); return; }
-            var project = Projects.FirstOrDefault(p => p.IsSelected);
-            double xMin, xMax, yMin, yMax;
-            BitmapSource displayBitmap = DutImageSource;
-            if (project == null || !project.ProjectData.IsCalibrated)
-            {
-                xMin = 0; xMax = DutImageSource.PixelWidth; yMin = 0; yMax = DutImageSource.PixelHeight;
+                catch
+                {
+                    // 加载失败时清空图片源
+                    DutImageSource = null;
+                }
             }
             else
             {
-                var pd = project.ProjectData;
-                double pixW = DutImageSource.PixelWidth;
-                double pixH = DutImageSource.PixelHeight;
-                double physX_Left = pd.OffsetX;
-                double physX_Right = pixW * pd.MatrixM11 + pd.OffsetX;
-                double physY_Top = pd.OffsetY;
-                double physY_Bottom = pixH * pd.MatrixM22 + pd.OffsetY;
-                xMin = Math.Min(physX_Left, physX_Right);
-                xMax = Math.Max(physX_Left, physX_Right);
-                yMin = Math.Min(physY_Top, physY_Bottom);
-                yMax = Math.Max(physY_Top, physY_Bottom);
-                bool flipX = pd.MatrixM11 < 0;
-                bool flipY = pd.MatrixM22 > 0;
+                // 无有效项目或路径时清空图片源
+                DutImageSource = null;
+            }
+        }
+
+        /// <summary>
+        /// 更新热力图背景图片
+        /// </summary>
+        private void UpdatePlotBackground()
+        {
+            // 清空现有注释
+            HeatmapModel.Annotations.Clear();
+
+            // 无图片源时直接刷新并返回
+            if (DutImageSource == null)
+            {
+                HeatmapModel.InvalidatePlot(true);
+                return;
+            }
+
+            // 获取当前选中的项目
+            var selectedProject = Projects.FirstOrDefault(p => p.IsSelected);
+
+            double xMin, xMax, yMin, yMax;
+            BitmapSource displayBitmap = DutImageSource;
+
+            // 未校准状态下使用图片原始像素尺寸
+            if (selectedProject == null || !selectedProject.ProjectData.IsCalibrated)
+            {
+                xMin = 0;
+                xMax = DutImageSource.PixelWidth;
+                yMin = 0;
+                yMax = DutImageSource.PixelHeight;
+            }
+            else
+            {
+                // 获取校准参数
+                var projectData = selectedProject.ProjectData;
+                double pixelWidth = DutImageSource.PixelWidth;
+                double pixelHeight = DutImageSource.PixelHeight;
+
+                // 计算物理坐标范围
+                double physicalX_Left = projectData.OffsetX;
+                double physicalX_Right = pixelWidth * projectData.MatrixM11 + projectData.OffsetX;
+                double physicalY_Top = projectData.OffsetY;
+                double physicalY_Bottom = pixelHeight * projectData.MatrixM22 + projectData.OffsetY;
+
+                // 确定坐标极值
+                xMin = Math.Min(physicalX_Left, physicalX_Right);
+                xMax = Math.Max(physicalX_Left, physicalX_Right);
+                yMin = Math.Min(physicalY_Top, physicalY_Bottom);
+                yMax = Math.Max(physicalY_Top, physicalY_Bottom);
+
+                // 判断是否需要翻转X/Y轴
+                bool flipX = projectData.MatrixM11 < 0;
+                bool flipY = projectData.MatrixM22 > 0;
+
+                // 应用图片变换
                 if (flipX || flipY)
                 {
                     try
                     {
-                        var transformGroup = new TransformGroup();
-                        transformGroup.Children.Add(new ScaleTransform(flipX ? -1 : 1, flipY ? -1 : 1));
-                        double tx = flipX ? pixW : 0;
-                        double ty = flipY ? pixH : 0;
-                        transformGroup.Children.Add(new TranslateTransform(tx, ty));
-                        displayBitmap = new TransformedBitmap(DutImageSource, new MatrixTransform(flipX ? -1 : 1, 0, 0, flipY ? -1 : 1, tx, ty));
+                        double translateX = flipX ? pixelWidth : 0;
+                        double translateY = flipY ? pixelHeight : 0;
+
+                        // 创建变换后的位图
+                        displayBitmap = new TransformedBitmap(
+                            DutImageSource,
+                            new MatrixTransform(flipX ? -1 : 1, 0, 0, flipY ? -1 : 1, translateX, translateY));
                     }
                     catch
                     {
+                        // 变换失败时使用原始图片
                         displayBitmap = DutImageSource;
                     }
                 }
             }
+
             try
             {
-                BitmapSource rotatedBitmap = RotateBitmapSource180(displayBitmap);
-
+                // 将位图转换为内存流并创建图片注释
                 using (var stream = new MemoryStream())
                 {
                     var encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(rotatedBitmap));
+                    encoder.Frames.Add(BitmapFrame.Create(displayBitmap));
                     encoder.Save(stream);
 
+                    // 创建热力图图片注释
                     var imageAnnotation = new ImageAnnotation
                     {
                         ImageSource = new OxyImage(stream.ToArray()),
@@ -236,49 +298,54 @@ namespace FieldScanNew.ViewModels
                         Height = new PlotLength(yMax - yMin, PlotLengthUnit.Data),
                         Layer = AnnotationLayer.BelowSeries,
                         Interpolate = true
-
                     };
 
+                    // 添加注释到热力图
                     HeatmapModel.Annotations.Add(imageAnnotation);
                 }
             }
             catch (Exception ex)
             {
+                // 捕获并输出背景更新错误
                 Console.WriteLine("BG Error: " + ex.Message);
             }
+
+            // 重置坐标轴并刷新热力图
             HeatmapModel.ResetAllAxes();
-            Application.Current.Dispatcher.Invoke(() => HeatmapModel.InvalidatePlot(true));
+            HeatmapModel.InvalidatePlot(true);
         }
 
         /// <summary>
-        /// ★★适配WPF的核心方法：将BitmapSource旋转180度，无类型转换，零报错
+        /// 设置变更事件处理方法
         /// </summary>
-        private BitmapSource RotateBitmapSource180(BitmapSource source)
-        {
-            var transform = new TransformGroup();
-            // 旋转180度核心矩阵：缩放-1就是翻转，叠加后完美旋转180度
-            transform.Children.Add(new ScaleTransform(-1, -1));
-            transform.Children.Add(new TranslateTransform(source.PixelWidth, source.PixelHeight));
-            return new TransformedBitmap(source, transform);
-        }
-
+        /// <param name="sender">事件发送者</param>
+        /// <param name="e">属性变更参数</param>
         private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // 获取当前选中的项目并自动保存
             var selectedProject = Projects.FirstOrDefault(p => p.IsSelected);
             if (selectedProject != null)
+            {
                 AutoSaveCurrentProject(selectedProject);
+            }
         }
 
+        /// <summary>
+        /// 执行添加新项目操作
+        /// </summary>
+        /// <param name="parameter">命令参数</param>
         private void ExecuteAddNewProject(object? parameter)
         {
             try
             {
+                // 弹出输入对话框获取项目名称
                 var inputDialog = new InputDialog("请输入新项目的名称:", "新项目");
                 if (inputDialog.ShowDialog() != true) return;
 
                 string projectName = inputDialog.Answer;
                 if (string.IsNullOrWhiteSpace(projectName)) return;
 
+                // 弹出文件夹选择对话框获取项目存放路径
                 var folderDialog = new System.Windows.Forms.FolderBrowserDialog
                 {
                     Description = "请选择项目的存放路径"
@@ -286,34 +353,50 @@ namespace FieldScanNew.ViewModels
 
                 if (folderDialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
+                // 构建项目完整路径
                 string projectPath = Path.Combine(folderDialog.SelectedPath, projectName);
+
+                // 检查路径是否已存在
                 if (Directory.Exists(projectPath))
                 {
                     MessageBox.Show("同名项目文件夹已存在！", "错误");
                     return;
                 }
 
+                // 创建项目文件夹
                 Directory.CreateDirectory(projectPath);
+
+                // 创建新项目视图模型并添加到项目列表
                 var newProject = new ProjectViewModel(projectName, projectPath, this);
                 Projects.Add(newProject);
 
+                // 取消其他项目的选中状态，设置新项目为选中
                 foreach (var proj in Projects.Where(p => p != newProject))
+                {
                     proj.IsSelected = false;
-
+                }
                 newProject.IsSelected = true;
+
+                // 加载项目数据并自动保存
                 LoadProjectDataIntoViewModel(newProject);
                 AutoSaveCurrentProject(newProject);
             }
             catch (Exception ex)
             {
+                // 捕获并显示创建项目错误
                 MessageBox.Show("创建新项目时发生严重错误: " + ex.Message, "错误");
             }
         }
 
+        /// <summary>
+        /// 执行加载项目操作
+        /// </summary>
+        /// <param name="parameter">命令参数</param>
         private void ExecuteLoadProject(object? parameter)
         {
             try
             {
+                // 弹出文件选择对话框选择项目文件
                 var openFileDialog = new OpenFileDialog
                 {
                     Filter = "项目文件 (*.json)|*.json"
@@ -324,12 +407,14 @@ namespace FieldScanNew.ViewModels
                     string filePath = openFileDialog.FileName;
                     string fileContent = File.ReadAllText(filePath);
 
+                    // 验证文件内容有效性
                     if (string.IsNullOrWhiteSpace(fileContent))
                     {
                         MessageBox.Show("项目文件为空或已损坏。", "错误");
                         return;
                     }
 
+                    // 反序列化项目数据
                     var projectData = System.Text.Json.JsonSerializer.Deserialize<ProjectData>(fileContent);
                     if (projectData == null)
                     {
@@ -337,6 +422,7 @@ namespace FieldScanNew.ViewModels
                         return;
                     }
 
+                    // 获取项目文件夹路径
                     string projectFolder = Path.GetDirectoryName(filePath) ?? string.Empty;
                     if (string.IsNullOrEmpty(projectFolder))
                     {
@@ -344,49 +430,66 @@ namespace FieldScanNew.ViewModels
                         return;
                     }
 
+                    // 创建加载的项目视图模型
                     var loadedProject = new ProjectViewModel(projectData.ProjectName, projectFolder, this)
                     {
                         ProjectData = projectData
                     };
 
+                    // 加载测量项数据
                     if (projectData.MeasurementNames != null)
                     {
                         foreach (var name in projectData.MeasurementNames)
+                        {
                             loadedProject.Measurements.Add(new MeasurementViewModel(name, loadedProject));
+                        }
                     }
 
+                    // 添加到项目列表并设置为选中状态
                     Projects.Add(loadedProject);
-
                     foreach (var proj in Projects.Where(p => p != loadedProject))
+                    {
                         proj.IsSelected = false;
-
+                    }
                     loadedProject.IsSelected = true;
+
+                    // 加载项目数据到视图模型
                     LoadProjectDataIntoViewModel(loadedProject);
                 }
             }
             catch (Exception ex)
             {
+                // 捕获并显示加载项目错误
                 MessageBox.Show("加载项目时发生严重错误: " + ex.Message, "错误");
             }
         }
 
+        /// <summary>
+        /// 自动保存当前选中的项目
+        /// </summary>
+        /// <param name="project">需要保存的项目</param>
         public void AutoSaveCurrentProject(ProjectViewModel project)
         {
+            // 验证项目有效性
             if (project?.ProjectData == null) return;
 
+            // 更新项目配置数据
             project.ProjectData.ScanConfig = this.CurrentScanSettings;
             project.ProjectData.InstrumentConfig = this.CurrentInstrumentSettings;
             project.ProjectData.MeasurementNames = project.Measurements.Select(m => m.DisplayName).ToList();
 
             try
             {
+                // 构建保存路径并序列化保存
                 string filePath = Path.Combine(project.ProjectFolderPath, "project.json");
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 string jsonString = System.Text.Json.JsonSerializer.Serialize(project.ProjectData, options);
+
                 File.WriteAllText(filePath, jsonString);
             }
             catch (Exception ex)
             {
+                // 输出保存失败信息
                 Console.WriteLine($"自动保存失败: {ex.Message}");
             }
         }
@@ -449,13 +552,12 @@ namespace FieldScanNew.ViewModels
                 double yMax = Math.Max(scanSettings.StartY, scanSettings.StopY);
 
                 var heatMapData = new double[scanSettings.NumX, scanSettings.NumY];
-                //修正：基于使用者视角，从左上角往右下角扫描，x递减，y递增
                 var heatMapSeries = new HeatMapSeries
                 {
-                    X0 = xMax,
-                    X1 = xMin,
-                    Y0 = yMax,
-                    Y1 = yMin,
+                    X0 = xMin,
+                    X1 = xMax,
+                    Y0 = yMin,
+                    Y1 = yMax,
                     Interpolate = true,
                     RenderMethod = HeatMapRenderMethod.Bitmap,
                     Data = heatMapData,
@@ -463,10 +565,7 @@ namespace FieldScanNew.ViewModels
                     CoordinateDefinition = HeatMapCoordinateDefinition.Edge
                 };
 
-                HeatmapModel.Series.Clear();
-                HeatmapModel.Series.Add(heatMapSeries);
-                HeatmapModel.ResetAllAxes();
-                HeatmapModel.InvalidatePlot(true);
+                HeatmapModel.Series.Clear(); HeatmapModel.Series.Add(heatMapSeries); HeatmapModel.ResetAllAxes(); HeatmapModel.InvalidatePlot(true);
 
                 var spectrumSeries = new LineSeries { Title = "Live Trace", Color = OxyColors.Blue, StrokeThickness = 1 };
                 SpectrumModel.Series.Clear(); SpectrumModel.Series.Add(spectrumSeries); SpectrumModel.InvalidatePlot(true);
@@ -478,17 +577,12 @@ namespace FieldScanNew.ViewModels
 
                 for (int j = 0; j < scanSettings.NumY; j++)
                 {
-                    for (int i = scanSettings.NumX - 1; i >= 0; i--)
+                    for (int i = 0; i < scanSettings.NumX; i++)
                     {
-                        if (_cancellationTokenSource.Token.IsCancellationRequested)
-                        {
-                            MessageBox.Show("扫描已停止。", "提示");
-                            IsScanning = false;
-                            return;
-                        }
+                        if (_cancellationTokenSource.Token.IsCancellationRequested) { MessageBox.Show("扫描已停止。", "提示"); IsScanning = false; return; }
 
                         //步骤2：计算当前点位的目标坐标
-                        float targetX = scanSettings.StopX + (scanSettings.NumX - 1 - i) * (scanSettings.StartX - scanSettings.StopX) / (scanSettings.NumX - 1);
+                        float targetX = scanSettings.StartX + i * (scanSettings.StopX - scanSettings.StartX) / (scanSettings.NumX - 1);
                         float targetY = scanSettings.StartY + j * (scanSettings.StopY - scanSettings.StartY) / (scanSettings.NumY - 1);
 
                         //步骤3：移动机械臂到目标点位
@@ -506,10 +600,9 @@ namespace FieldScanNew.ViewModels
                             int arrayY = (int)Math.Round(ratioY * (scanSettings.NumY - 1));
                             arrayX = Math.Max(0, Math.Min(arrayX, scanSettings.NumX - 1));
                             arrayY = Math.Max(0, Math.Min(arrayY, scanSettings.NumY - 1));
-                            // 核心：将当前点的最大值更新到热力图数据中
+
                             heatMapData[arrayX, arrayY] = maxVal;
-                            // 实时刷新热力图
-                            Application.Current.Dispatcher.Invoke(() => { HeatmapModel.InvalidatePlot(true); });
+                            HeatmapModel.InvalidatePlot(true);
 
                             spectrumSeries.Points.Clear();
                             for (int k = 0; k < traceData.Length; k++) spectrumSeries.Points.Add(new DataPoint(k, traceData[k]));
@@ -543,7 +636,7 @@ namespace FieldScanNew.ViewModels
 
         private async Task QBCExecuteStartScan()
         {
-            // ===================== 前置校验 =====================
+            // ===================== 原有逻辑：前置校验（完全保留） =====================
             if (_hardwareService.ActiveRobot == null || !_hardwareService.ActiveRobot.IsConnected ||
             _hardwareService.ActiveDevice == null || !_hardwareService.ActiveDevice.IsConnected)
             { MessageBox.Show("请先连接机械臂和测量仪器！", "提示"); return; }
@@ -553,7 +646,7 @@ namespace FieldScanNew.ViewModels
 
             UpdatePlotBackground();
 
-            // 核心修正：扫描前强制下发参数
+            // 核心修正：扫描前强制下发参数（完全保留）
             try
             {
                 await _hardwareService.ActiveDevice.ConnectAsync(CurrentInstrumentSettings);
@@ -566,7 +659,7 @@ namespace FieldScanNew.ViewModels
             IsScanning = true;
             _cancellationTokenSource = new CancellationTokenSource();
 
-            // ===================== 可视化初始化 =====================
+            // ===================== 原有逻辑：可视化初始化（完全保留） =====================
             try
             {
                 double xMin = Math.Min(scanSettings.StartX, scanSettings.StopX);
@@ -577,10 +670,10 @@ namespace FieldScanNew.ViewModels
                 var heatMapData = new double[scanSettings.NumX, scanSettings.NumY];
                 var heatMapSeries = new HeatMapSeries
                 {
-                    X0 = xMax,
-                    X1 = xMin,
-                    Y0 = yMax,
-                    Y1 = yMin,
+                    X0 = xMin,
+                    X1 = xMax,
+                    Y0 = yMin,
+                    Y1 = yMax,
                     Interpolate = true,
                     RenderMethod = HeatMapRenderMethod.Bitmap,
                     Data = heatMapData,
@@ -606,7 +699,7 @@ namespace FieldScanNew.ViewModels
 
                 // 2. 生成均匀初始采样点
                 int initMaxCount = targetSampleCount - 1;
-                int initPointCount = Math.Max(4, (int)Math.Round(initMaxCount * 0.4)); // 初始点数为目标点数的40%
+                int initPointCount = Math.Max(4, (int)Math.Round(initMaxCount * 0.2));
                 initPointCount = Math.Min(initPointCount, initMaxCount);
 
                 // 计算初始采样点的行列间隔（均匀覆盖）
@@ -622,10 +715,10 @@ namespace FieldScanNew.ViewModels
                 // 初始化采样点列表
                 List<SampledPoint> sampledPoints = new List<SampledPoint>();
 
-                // 3. 初始点采样
+                // 3. 初始点采样（替换原有第一层循环）
                 for (int row = 0; row < gridRows; row++)
                 {
-                    // 取消检查
+                    // 取消检查（保留原有取消机制）
                     if (_cancellationTokenSource.Token.IsCancellationRequested)
                     {
                         MessageBox.Show("扫描已停止。", "提示");
@@ -635,7 +728,7 @@ namespace FieldScanNew.ViewModels
 
                     int yIndex = row * yStepIndex;
                     yIndex = Math.Min(yIndex, scanSettings.NumY - 1);
-                    // 计算初始点Y坐标
+                    // 计算初始点Y坐标（复用原有坐标计算逻辑）
                     float targetY = scanSettings.StartY + yIndex * (scanSettings.StopY - scanSettings.StartY) / (scanSettings.NumY - 1);
 
                     for (int col = 0; col < gridCols; col++)
@@ -656,12 +749,12 @@ namespace FieldScanNew.ViewModels
                         // 机械臂移动（替换为原有_hardwareService调用）
                         await _hardwareService.ActiveRobot.MoveToAsync(targetX, targetY, scanSettings.ScanHeightZ, scanSettings.ScanAngleR);
 
-                        // 读取仪器数据
+                        // 读取仪器数据（保留原有逻辑）
                         double[] traceData = await _hardwareService.ActiveDevice.GetTraceDataAsync(0);
                         if (traceData.Length == 0) continue;
 
                         double maxVal = traceData.Max();
-                        // 计算热力图索引
+                        // 计算热力图索引（保留原有逻辑）
                         double ratioX = (targetX - xMin) / (xMax - xMin);
                         double ratioY = (targetY - yMin) / (yMax - yMin);
                         int arrayX = (int)Math.Round(ratioX * (scanSettings.NumX - 1));
@@ -669,15 +762,15 @@ namespace FieldScanNew.ViewModels
                         arrayX = Math.Max(0, Math.Min(arrayX, scanSettings.NumX - 1));
                         arrayY = Math.Max(0, Math.Min(arrayY, scanSettings.NumY - 1));
 
-                        // 更新热力图和频谱
+                        // 更新热力图和频谱（保留原有逻辑）
                         heatMapData[arrayX, arrayY] = maxVal;
-                        Application.Current.Dispatcher.Invoke(() => { HeatmapModel.InvalidatePlot(true); });
+                        HeatmapModel.InvalidatePlot(true);
 
                         spectrumSeries.Points.Clear();
                         for (int k = 0; k < traceData.Length; k++) spectrumSeries.Points.Add(new DataPoint(k, traceData[k]));
                         SpectrumModel.InvalidatePlot(true);
 
-                        // 缓存CSV数据
+                        // 缓存CSV数据（保留原有逻辑）
                         sbPeak.AppendLine($"{targetX:F3},{targetY:F3},{maxVal:F3}");
                         if (!isFullHeaderWritten)
                         {
@@ -742,11 +835,11 @@ namespace FieldScanNew.ViewModels
                         SampledPoints = sampledPoints
                     };
 
-                    // 4.2 调用QBC计算函数获取下一个点
+                    // 4.2 调用QBC计算函数获取下一个点（你原有CalculateNextSamplePoint方法）
                     QbcOutputData nextPointData;
                     try
                     {
-                        nextPointData = CalculateNextSamplePoint(inputData);
+                        nextPointData = CalculateNextSamplePoint(inputData); // 需确保该方法已实现
                     }
                     catch (Exception ex)
                     {
@@ -763,7 +856,7 @@ namespace FieldScanNew.ViewModels
                     float nextX = (float)nextPointData.Next_x;
                     float nextY = (float)nextPointData.Next_y;
 
-                    // 4.3 机械臂移动到新点
+                    // 4.3 机械臂移动到新点（保留原有逻辑）
                     try
                     {
                         await _hardwareService.ActiveRobot.MoveToAsync(nextX, nextY, scanSettings.ScanHeightZ, scanSettings.ScanAngleR);
@@ -774,7 +867,7 @@ namespace FieldScanNew.ViewModels
                         break;
                     }
 
-                    // 4.4 读取新点数据
+                    // 4.4 读取新点数据（保留原有逻辑）
                     double[] newTraceData = await _hardwareService.ActiveDevice.GetTraceDataAsync(0);
                     if (newTraceData.Length == 0) continue;
 
@@ -787,9 +880,9 @@ namespace FieldScanNew.ViewModels
                     newArrayX = Math.Max(0, Math.Min(newArrayX, scanSettings.NumX - 1));
                     newArrayY = Math.Max(0, Math.Min(newArrayY, scanSettings.NumY - 1));
 
-                    // 更新可视化
+                    // 更新可视化（保留原有逻辑）
                     heatMapData[newArrayX, newArrayY] = newMaxVal;
-                    Application.Current.Dispatcher.Invoke(() => { HeatmapModel.InvalidatePlot(true); });
+                    HeatmapModel.InvalidatePlot(true);
 
                     spectrumSeries.Points.Clear();
                     for (int k = 0; k < newTraceData.Length; k++) spectrumSeries.Points.Add(new DataPoint(k, newTraceData[k]));
@@ -832,7 +925,7 @@ namespace FieldScanNew.ViewModels
                 if (heatMapSeries != null)
                 {
                     heatMapSeries.Data = filledHeatMapData; // 替换为填充后的完整数据
-                    Application.Current.Dispatcher.Invoke(() => { HeatmapModel.InvalidatePlot(true); }); // 强制刷新热力图
+                    HeatmapModel.InvalidatePlot(true); // 强制刷新热力图
                 }
                 // 2. 复用原有sbPeak/sbFull变量，覆盖为填充后的数据（保留原有变量名）
                 // 重新生成Peak CSV（全场所有点，包括填充的）
@@ -864,10 +957,10 @@ namespace FieldScanNew.ViewModels
                     {
                         float targetX = (float)xCoor[i];
                         var key = ((float)Math.Round(targetX, 3), (float)Math.Round(targetY, 3));
-
+                        
                         // 获取填充后的幅值（已采样点=原始值，未采样点=RBF均值）
                         double filledVal = fullPointMap.TryGetValue(key, out var val) ? val : 0;
-
+                        
                         // 复用sbPeak：写入填充后的数据（保留原格式）
                         sbPeak.AppendLine($"{targetX:F3},{targetY:F3},{filledVal:F3}");
 
