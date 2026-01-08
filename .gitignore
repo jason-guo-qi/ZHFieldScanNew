@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/FieldScanNew/ViewModels/MainViewModel.cs
+/FieldScanNew/ViewModels/XYCalibViewModel.cs
+/.gitignore
+/.gitignore
