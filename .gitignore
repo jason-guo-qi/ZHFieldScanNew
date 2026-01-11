@@ -362,9 +362,3 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /工程测试/0108
-/FieldScanNew/ViewModels/XYCalibViewModel.cs
-/FieldScanNew/ViewModels/MainViewModel.cs
-/FieldScanNew/Services/ScaraRobotArm.cs
-/FieldScanNew/Models/ProjectData.cs
-/.gitignore
-/.gitignore
