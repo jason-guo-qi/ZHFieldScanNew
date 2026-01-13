@@ -245,11 +245,20 @@ namespace FieldScanNew.ViewModels
             _projectData.MatrixM21 = 0;
             _projectData.OffsetX = offsetX;
             _projectData.OffsetY = offsetY;
+
+            // 计算旋转角度（标准化为90度倍数）
+            double pixAngle = Math.Atan2(dyPix, dxPix);
+            double phyAngle = Math.Atan2(dyPhy, dxPhy);
+            double rotateAngle = (phyAngle - pixAngle) * (180.0 / Math.PI);
+            int standardAngle = (int)Math.Round(rotateAngle / 90.0) * 90;
+            standardAngle = (standardAngle + 360) % 360;
+            _projectData.RotateAngle = standardAngle;
+
             _projectData.IsCalibrated = true;
 
             // 提示校准成功
             MessageBox.Show(
-                $"校准成功！\n高度(Z): {_projectData.ScanConfig.ScanHeightZ:F2} mm\n角度(R): {_projectData.ScanConfig.ScanAngleR:F2} °",
+                $"校准成功！\n高度(Z): {_projectData.ScanConfig.ScanHeightZ:F2} mm\n角度(R): {_projectData.ScanConfig.ScanAngleR:F2} °\n旋转角度： {standardAngle} °",
                 "成功"
             );
         }

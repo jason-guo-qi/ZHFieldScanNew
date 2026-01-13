@@ -165,8 +165,6 @@ namespace FieldScanNew.ViewModels
             CurrentInstrumentSettings.PropertyChanged += OnSettingsChanged;
         }
 
-        // ... (LoadDutImage, UpdatePlotBackground, OnSettingsChanged... 保持不变，为了节省篇幅已省略) ...
-        // 请务必保留您原文件中的这些辅助方法
         /// <summary>
         /// 加载被测设备(DUT)的图片
         /// </summary>
@@ -254,22 +252,29 @@ namespace FieldScanNew.ViewModels
                 yMin = Math.Min(physicalY_Top, physicalY_Bottom);
                 yMax = Math.Max(physicalY_Top, physicalY_Bottom);
 
-                // 判断是否需要翻转X/Y轴
-                bool flipX = projectData.MatrixM11 < 0;
-                bool flipY = projectData.MatrixM22 > 0;
+                // 判断是否需要翻转X/Y轴，原有逻辑
+                // bool flipX = projectData.MatrixM11 < 0;
+                // bool flipY = projectData.MatrixM22 > 0;
 
                 // 应用图片变换
-                if (flipX || flipY)
+                if (projectData.RotateAngle != 0)
                 {
                     try
                     {
-                        double translateX = flipX ? pixelWidth : 0;
-                        double translateY = flipY ? pixelHeight : 0;
+                        //以图片中心旋转
+                        var rotateTransform = new RotateTransform(projectData.RotateAngle, pixelWidth / 2, pixelHeight / 2);
+                        displayBitmap = new TransformedBitmap(DutImageSource, rotateTransform);
 
-                        // 创建变换后的位图
-                        displayBitmap = new TransformedBitmap(
-                            DutImageSource,
-                            new MatrixTransform(flipX ? -1 : 1, 0, 0, flipY ? -1 : 1, translateX, translateY));
+                        if (projectData.RotateAngle == 90 || projectData.RotateAngle == 270)
+                        {
+                            // 交换宽高
+                            double tempXMin = xMin;
+                            double tempXMax = xMax;
+                            xMin = yMin;
+                            xMax = yMax;
+                            yMin = tempXMin;
+                            yMax = tempXMax;
+                        }
                     }
                     catch
                     {
