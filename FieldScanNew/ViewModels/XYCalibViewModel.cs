@@ -3,6 +3,7 @@ using FieldScanNew.Models;
 using FieldScanNew.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -217,7 +218,7 @@ namespace FieldScanNew.ViewModels
 
             // 计算像素坐标差值
             double dxPix = _pixelP2.X - _pixelP1.X;
-            double dyPix = _pixelP2.Y - _pixelP1.Y;
+            double dyPix = _pixelP2.Y - _pixelP1.Y; //图像y方向上面小，下面大
 
             // 计算物理坐标差值
             double dxPhy = PhysicalX2 - PhysicalX1;
@@ -247,12 +248,13 @@ namespace FieldScanNew.ViewModels
             _projectData.OffsetY = offsetY;
 
             // 计算旋转角度（标准化为90度倍数）
-            double pixAngle = Math.Atan2(dyPix, dxPix);
+            double pixAngle = Math.Atan2(-dyPix, dxPix);
             double phyAngle = Math.Atan2(dyPhy, dxPhy);
-            double rotateAngle = (phyAngle - pixAngle) * (180.0 / Math.PI);
+            double rotateAngle = (pixAngle - phyAngle) * (180.0 / Math.PI);
             int standardAngle = (int)Math.Round(rotateAngle / 90.0) * 90;
             standardAngle = (standardAngle + 360) % 360;
             _projectData.RotateAngle = standardAngle;
+
 
             _projectData.IsCalibrated = true;
 
