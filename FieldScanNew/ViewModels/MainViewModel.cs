@@ -225,6 +225,10 @@ namespace FieldScanNew.ViewModels
             double xMin, xMax, yMin, yMax;
             BitmapSource displayBitmap = DutImageSource;
 
+            double originalWidth = DutImageSource.PixelWidth;
+            double originalHeight = DutImageSource.PixelHeight;
+            double rotateAngle = selectedProject?.ProjectData?.RotateAngle ?? 0;
+
             // 未校准状态下使用图片原始像素尺寸
             if (selectedProject == null || !selectedProject.ProjectData.IsCalibrated)
             {
@@ -237,8 +241,8 @@ namespace FieldScanNew.ViewModels
             {
                 // 获取校准参数
                 var projectData = selectedProject.ProjectData;
-                double pixelWidth = DutImageSource.PixelWidth;
-                double pixelHeight = DutImageSource.PixelHeight;
+                double pixelWidth = originalWidth;
+                double pixelHeight = originalHeight;
 
                 // 计算物理坐标范围
                 double physicalX_Left = projectData.OffsetX;
@@ -252,28 +256,54 @@ namespace FieldScanNew.ViewModels
                 yMin = Math.Min(physicalY_Top, physicalY_Bottom);
                 yMax = Math.Max(physicalY_Top, physicalY_Bottom);
 
-                // 判断是否需要翻转X/Y轴
-                bool flipX = projectData.MatrixM11 < 0;
-                bool flipY = projectData.MatrixM22 > 0;
+                rotateAngle = projectData.RotateAngle;
+            }
 
-                // 应用图片变换
-                if (flipX || flipY)
+            // 判断是否需要翻转X/Y轴，原有逻辑
+            // bool flipX = projectData.MatrixM11 < 0;
+            // bool flipY = projectData.MatrixM22 > 0;
+
+            // 应用图片变换
+            if (rotateAngle != 0 && rotateAngle % 360 !=0)
+            {
+                try
                 {
-                    try
-                    {
-                        double translateX = flipX ? pixelWidth : 0;
-                        double translateY = flipY ? pixelHeight : 0;
+                    //以图片中心旋转
+                    var rotateTransform = new RotateTransform(rotateAngle);
+                    rotateTransform.CenterX = originalWidth / 2;
+                    rotateTransform.CenterY = originalHeight / 2;
+                    displayBitmap = new TransformedBitmap(DutImageSource, rotateTransform);
 
-                        // 创建变换后的位图
-                        displayBitmap = new TransformedBitmap(
-                            DutImageSource,
-                            new MatrixTransform(flipX ? -1 : 1, 0, 0, flipY ? -1 : 1, translateX, translateY));
-                    }
-                    catch
+                    switch (rotateAngle % 360)
                     {
-                        // 变换失败时使用原始图片
-                        displayBitmap = DutImageSource;
+                        case 90:
+                        case 270:
+                            // 90/270度：X/Y轴交换，尺寸也交换
+                            (xMin, yMin) = (yMin, xMin);
+                            (xMax, yMax) = (yMax, xMax);
+                            // 补充：交换后重新计算极值（避免坐标范围错误）
+                            double tempXMin = xMin;
+                            double tempXMax = xMax;
+                            xMin = Math.Min(yMin, yMax);
+                            xMax = Math.Max(yMin, yMax);
+                            yMin = Math.Min(tempXMin, tempXMax);
+                            yMax = Math.Max(tempXMin, tempXMax);
+                            break;
+                        case 180:
+                            // 180度：仅翻转，不交换X/Y
+                            (xMin, xMax) = (xMax, xMin);
+                            (yMin, yMax) = (yMax, yMin);
+                            break;
+                        default:
+                            // 其他角度：不调整坐标（保持原始）
+                            break;
                     }
+                }
+                catch (Exception ex)
+                {
+                    // 变换失败时使用原始图片
+                    Console.WriteLine("旋转失败：" + ex.Message);
+                    displayBitmap = DutImageSource;
                 }
             }
 
@@ -295,7 +325,7 @@ namespace FieldScanNew.ViewModels
                         Width = new PlotLength(xMax - xMin, PlotLengthUnit.Data),
                         Height = new PlotLength(yMax - yMin, PlotLengthUnit.Data),
                         Layer = AnnotationLayer.BelowSeries,
-                        Interpolate = true
+                        Interpolate = true,
                     };
 
                     // 添加注释到热力图
